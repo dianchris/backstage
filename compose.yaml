@@ -1,0 +1,49 @@
+name: backstage
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:${BACKSTAGE_UI_PORT:-3110}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+  backend:
+    build: ./backend
+    ports:
+      - "127.0.0.1:${BACKSTAGE_API_PORT:-8091}:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/backstage
+      SPRING_DATASOURCE_USERNAME: backstage
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-local-backstage-db}
+      PORTAL_REGISTRATION_URL: ${PORTAL_REGISTRATION_URL:-http://host.docker.internal:8092/internal/v1/registrations}
+      PORTAL_PASSWORD_RESET_URL: ${PORTAL_PASSWORD_RESET_URL:-}
+      EMAIL_PASSWORD_RESET_TEMPLATE_CODE: ${EMAIL_PASSWORD_RESET_TEMPLATE_CODE:-API_PORTAL_PASSWORD_RESET}
+      PORTAL_REGISTRATION_TOKEN: ${PORTAL_REGISTRATION_TOKEN:-local-backstage-registration}
+      EMAIL_API_URL: ${EMAIL_API_URL:-}
+      EMAIL_API_TOKEN: ${EMAIL_API_TOKEN:-}
+      EMAIL_TEMPLATE_CODE: ${EMAIL_TEMPLATE_CODE:-API_PORTAL_ONBOARDING_INVITATION}
+      PORTAL_PUBLIC_URL: ${PORTAL_PUBLIC_URL:-http://localhost:3000}
+      BACKSTAGE_TOKEN: ${BACKSTAGE_TOKEN:-local-backstage-portal}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8080'"]
+      interval: 3s
+      timeout: 3s
+      retries: 25
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: backstage
+      POSTGRES_DB: backstage
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-backstage-db}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "backstage", "-d", "backstage"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  database:
